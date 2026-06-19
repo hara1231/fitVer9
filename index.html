@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MY FITNESS</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui, sans-serif;background:#f5f5f7;color:#111}
+    #app{max-width:520px;margin:0 auto;padding:20px}
+    .card{background:#fff;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.05);padding:20px;margin-bottom:16px}
+    .section-title{font-size:18px;font-weight:800;margin-bottom:12px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 16px;border-radius:12px;border:none;background:#111;color:#fff;font-weight:700;cursor:pointer}
+    .btn-outline{border:1px solid #ddd;background:#fff;color:#111}
+    .input{width:100%;padding:12px 14px;border:1px solid #ddd;border-radius:12px;margin-top:8px;margin-bottom:14px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .metric{font-size:14px;color:#555;margin-bottom:6px}
+    .metric strong{display:block;font-size:24px;color:#111}
+    ul{list-style:none}
+    li{padding:12px 14px;border:1px solid #eee;border-radius:12px;margin-bottom:10px;background:#fafafa;display:flex;justify-content:space-between;align-items:center}
+    li button{border:none;background:none;color:#888;font-size:18px;cursor:pointer}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const STORAGE_KEY = 'fitver9-data';
+    const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    state.workouts = state.workouts || [];
+    state.meals = state.meals || [];
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({workouts: state.workouts, meals: state.meals}));
+    }
+
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+
+    function today() {
+      return formatDate(new Date());
+    }
+
+    function kcalSum(list) {
+      return list.reduce((sum, item) => sum + (item.kcal || 0), 0);
+    }
+
+    function buildHome() {
+      const todayWorkouts = state.workouts.filter(item => item.date === today());
+      const todayMeals = state.meals.filter(item => item.date === today());
+      const burn = kcalSum(todayWorkouts);
+      const intake = kcalSum(todayMeals);
+      const net = intake - burn;
+
+      return `
+        <header>
+          <div>
+            <div style="font-size:12px;color:#888;margin-bottom:4px">MY FITNESS</div>
+            <h1 style="font-size:28px;letter-spacing:0.02em">Dashboard</h1>
+          </div>
+          <button class="btn" id="btn-go-log">記録する</button>
+        </header>
+        <div class="card">
+          <div class="section-title">今日のサマリー</div>
+          <div class="row">
+            <div class="metric"><span>摂取</span><strong>${intake} kcal</strong></div>
+            <div class="metric"><span>消費</span><strong>${burn} kcal</strong></div>
+          </div>
+          <div class="metric"><span>収支</span><strong>${net > 0 ? '+' + net : net} kcal</strong></div>
+        </div>
+        <div class="card">
+          <div class="section-title">本日の種目</div>
+          ${todayWorkouts.length ? `<ul>${todayWorkouts.map(item => `<li>${item.name} <span>${item.kcal} kcal</span></li>`).join('')}</ul>` : '<p style="color:#666">まだトレーニング記録がありません</p>'}
+        </div>
+        <div class="card">
+          <div class="section-title">本日の食事</div>
+          ${todayMeals.length ? `<ul>${todayMeals.map(item => `<li>${item.name} <span>${item.kcal} kcal</span></li>`).join('')}</ul>` : '<p style="color:#666">まだ食事記録がありません</p>'}
+        </div>
+      `;
+    }
+
+    function buildLog() {
+      return `
+        <button class="btn btn-outline" id="btn-back">← 戻る</button>
+        <div class="card">
+          <div class="section-title">トレーニングを追加</div>
+          <input class="input" id="input-workout-name" placeholder="種目名を入力">
+          <input class="input" id="input-workout-kcal" type="number" placeholder="消費カロリー">
+          <button class="btn" id="btn-save-workout">保存</button>
+        </div>
+        <div class="card">
+          <div class="section-title">食事を追加</div>
+          <input class="input" id="input-meal-name" placeholder="食事名を入力">
+          <input class="input" id="input-meal-kcal" type="number" placeholder="摂取カロリー">
+          <button class="btn" id="btn-save-meal">保存</button>
+        </div>
+      `;
+    }
+
+    function render(page = 'home') {
+      const app = document.getElementById('app');
+      app.innerHTML = page === 'home' ? buildHome() : buildLog();
+      attachEvents(page);
+    }
+
+    function attachEvents(page) {
+      if (page === 'home') {
+        document.getElementById('btn-go-log').addEventListener('click', () => render('log'));
+      } else {
+        document.getElementById('btn-back').addEventListener('click', () => render('home'));
+        document.getElementById('btn-save-workout').addEventListener('click', () => {
+          const name = document.getElementById('input-workout-name').value.trim();
+          const kcal = parseInt(document.getElementById('input-workout-kcal').value, 10);
+          if (!name || !kcal) return;
+          state.workouts.push({id: Date.now(), date: today(), name, kcal});
+          saveState();
+          render('home');
+        });
+        document.getElementById('btn-save-meal').addEventListener('click', () => {
+          const name = document.getElementById('input-meal-name').value.trim();
+          const kcal = parseInt(document.getElementById('input-meal-kcal').value, 10);
+          if (!name || !kcal) return;
+          state.meals.push({id: Date.now(), date: today(), name, kcal});
+          saveState();
+          render('home');
+        });
+      }
+    }
+
+    render('home');
+  </script>
+</body>
+</html>
